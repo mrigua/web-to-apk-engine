@@ -1,4 +1,4 @@
-name: Build APK from Firebase Trigger
+name: Build APK from Firebase
 on:
   repository_dispatch:
     types: [build_apk]
@@ -7,9 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: set up JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -18,19 +19,23 @@ jobs:
 
       - name: Inject Website Data
         run: |
-          # Replace URL in MainActivity.kt
-          sed -i "s|PLACEHOLDER_URL|${{ github.event.client_payload.url }}|g" app/src/main/java/com/example/app/MainActivity.kt
-          # Replace App Name in strings.xml
-          sed -i "s|PLACEHOLDER_NAME|${{ github.event.client_payload.name }}|g" app/src/main/res/values/strings.xml
+          # 1. Update the App Name in strings.xml
+          # We look for the app_name tag and replace its content
+          sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">${{ github.event.client_payload.name }}</string>|g" app/src/main/res/values/strings.xml
+          
+          # 2. Update the URL in MainActivity.kt
+          # This assumes you have a placeholder string in your MainActivity
+          # If you haven't edited MainActivity.kt yet, do that next (see Step 2 below)
+          find app/src/main/java -name "MainActivity.kt" -exec sed -i "s|PLACEHOLDER_URL|${{ github.event.client_payload.url }}|g" {} +
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
+      - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Generated-Web-App
+          name: ${{ github.event.client_payload.name }}-v1.0
           path: app/build/outputs/apk/debug/app-debug.apk
